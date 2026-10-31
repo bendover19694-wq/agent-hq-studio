@@ -13,7 +13,7 @@ import { openLightbox } from './views/lightbox.js';
 
 const views = { home, lead, team, tasks, review, settings };
 // Pages built by another module owner load on their own, so one broken page never takes the shell down.
-await Promise.all(['games', 'pitches', 'market', 'library'].map(async (n) => {
+await Promise.all(['games', 'pitches', 'market', 'library', 'link'].map(async (n) => {
   try { views[n] = await import(`./views/${n}.js`); } catch (e) {
     console.warn('page not available:', n, e.message);
     views[n] = { render: () => h('div', { class: 'page' }, empty(`The ${n} page is not available yet.`)) };
@@ -22,10 +22,10 @@ await Promise.all(['games', 'pitches', 'market', 'library'].map(async (n) => {
 
 const SECTIONS = [
   ['Workspace', [['home', 'Home', 'home'], ['lead', 'Lead', 'lead'], ['team', 'Team', 'team'], ['tasks', 'Tasks', 'tasks'], ['review', 'Review', 'review']]],
-  ['Studio', [['games', 'Games', 'games'], ['pitches', 'Pitches', 'pitches'], ['market', 'Market', 'market'], ['library', 'Library', 'library']]],
+  ['Studio', [['games', 'Games', 'games'], ['pitches', 'Pitches', 'pitches'], ['market', 'Market', 'market'], ['library', 'Library', 'library'], ['link', 'HQ Link', 'team']]],
 ];
-const PAGE_LABEL = { home: 'Home', lead: 'Lead', team: 'Team', tasks: 'Tasks', review: 'Review', games: 'Games', pitches: 'Pitches', market: 'Market', library: 'Library', settings: 'Settings' };
-const PAGE_SUB = { home: 'Overview', lead: 'Chat with the Lead', team: 'Roster', tasks: 'All work', review: 'Images and stages', games: 'All games', pitches: 'Ideas', market: 'Charts and benchmarks', library: 'Assets and knowledge', settings: 'Preferences' };
+const PAGE_LABEL = { link: 'HQ Link', home: 'Home', lead: 'Lead', team: 'Team', tasks: 'Tasks', review: 'Review', games: 'Games', pitches: 'Pitches', market: 'Market', library: 'Library', settings: 'Settings' };
+const PAGE_SUB = { link: 'Work with another HQ', home: 'Overview', lead: 'Chat with the Lead', team: 'Roster', tasks: 'All work', review: 'Images and stages', games: 'All games', pitches: 'Ideas', market: 'Charts and benchmarks', library: 'Assets and knowledge', settings: 'Preferences' };
 
 const side = document.getElementById('side');
 const topbar = document.getElementById('topbar');

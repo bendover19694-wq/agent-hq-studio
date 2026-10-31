@@ -1,57 +1,54 @@
 # Agent HQ Studio
 
-Agent HQ, the Roblox AI Studio Vault and the Roblox game gate in one folder.
+Agent HQ, the Roblox AI Studio Vault and the Roblox game gate, installed in one step.
 
-- **`tools/agent-hq/`**: a local control room for a 16-role Claude Code team. It has chat per role, a task board, review gates and a game pipeline. It runs on Node with no packages to install.
+- **`tools/agent-hq/`**: a local control room for a 16-role Claude Code team. It has chat per role, a task board, review gates, a game pipeline and HQ Link.
 - **`vault/`**: an Obsidian vault with the operating rules, the Master Prompt, templates and seven Roblox skills.
 - **`gate/`**: the quality gate. Every Roblox coding request goes through a vault search, section, asset and standards checks, and an independent review.
 
-## Setup
+## Install
 
-You need [Claude Code](https://claude.com/claude-code), [Node 20 or newer](https://nodejs.org), Git, Python 3 and Roblox Studio. Windows is the tested platform.
+You need [Node 22.13 or newer](https://nodejs.org), [Git](https://git-scm.com), [Python 3](https://python.org), [Claude Code](https://claude.com/claude-code) and Roblox Studio. Windows is the tested platform.
 
-1. Copy `tools/`, `scripts/` and `.claude/` into your game's repo root. HQ expects to run from there.
-2. Start HQ. Double-click `scripts/Agent HQ.bat`, or run:
+```bash
+git clone https://github.com/bendover19694-wq/agent-hq-studio
+```
 
-    ```bash
-    node tools/agent-hq/server.mjs
-    ```
+Then double-click `install.bat` and type your game's folder. Or run:
 
-3. Open http://127.0.0.1:4317. The first run creates `.agent-hq/`, which holds your token and task database. Add `.agent-hq/` to your `.gitignore` and never share it.
-4. In your game's `CLAUDE.md`, add one line pointing at the vault, using your own path:
+```bash
+node agent-hq-studio/install.mjs --game "C:/path/to/your/game"
+```
 
-    ```
-    @C:/path/to/Agent-HQ-Studio/vault/CLAUDE.md
-    ```
+The installer copies HQ into your game, links the vault, installs the skills, the gate and the LihFolk plugin, and tells you if anything is missing. Keep the cloned folder, because your game's `CLAUDE.md` points at the vault inside it.
 
-5. Open `vault/` in Obsidian with **Open folder as vault**, and read `00 Home.md`.
-6. In HQ, give the Lead role one task: read the vault and adopt its rules.
+Run it again at any time to update. It never touches your own notes, your HQ data or your role memory.
 
-## Add the Roblox gate
+Start HQ with `scripts/Agent HQ.bat` in your game folder.
 
-1. Copy `gate/roblox-game-gate/` to `~/.claude/skills/`.
-2. Copy `gate/roblox-gate.js` to `~/.claude/hooks/`.
-3. Add this to `hooks` in `~/.claude/settings.json`:
+## HQ Link: work with a friend's HQ
 
-    ```json
-    "UserPromptSubmit": [
-      { "hooks": [{ "type": "command", "command": "node \"$HOME/.claude/hooks/roblox-gate.js\"", "timeout": 5 }] }
-    ]
-    ```
+Two HQs on different networks can talk and share tasks through a Discord channel. No ports are opened and no tunnel is needed, because each HQ checks the channel with its own bot.
 
-4. Start a new Claude Code session. Roblox coding requests now load the gate.
+1. Each person makes a Discord bot and adds it to a shared server. In the [Developer Portal](https://discord.com/developers/applications), turn on **Message Content Intent**. A dedicated channel such as `#hq-link` keeps the JSON posts out of the way.
+2. Each person opens **HQ Link** in HQ and saves their bot token. The first person also adds the channel id.
+3. Swap invites and paste each other's. An invite holds no secrets.
 
-The gate's probes are in `gate/roblox-game-gate/tools/`. List your own game's screens in `scripts/probes/sections.json`.
+After that:
 
-## Add LihFolk (recommended)
+- **Talk:** use the HQ Link page. Agents use `hq_link_read` and `hq_link_say`.
+- **Share a task:** use the page, or the Lead's `hq_link_share`. It lands in the other owner's **Review**, it only runs if they accept it, and you hear how it ends.
 
-The gate searches the LihFolk Vault. It is someone else's work, so it isn't copied here. Install it yourself:
+**Safety:**
 
-1. In Claude Code, type `/plugin`.
-2. Choose **Add marketplace**, then **Add from a repository**.
-3. Paste `https://github.com/lihfolk-cy/v2-vault` and install **Lihfolk**.
+- Only posts from the paired bot's id count. Anyone else in the channel is ignored.
+- Shared tasks never run by themselves, and they go to the other side's Lead with a warning that the text came from outside.
+- Linked messages never start an agent, so two AIs cannot run up each other's usage.
+- HQ stays on `127.0.0.1`. Your bot token stays in `.agent-hq/link-token` and is never sent to the other HQ.
+- Common token formats are stripped from outgoing text, but don't rely on that: never put secrets in a linked message.
+- Reset your bot token if it ever leaks, and only pair with people you trust.
 
-Then replace the `C:/Users/YOU/Documents/LihFolk-V2` paths in the gate with your own clone. Without LihFolk the gate still runs, minus the vault search and code scan.
+Files are not shared over the link. Use Git for those.
 
 ## Check it works
 
@@ -59,7 +56,7 @@ Then replace the `C:/Users/YOU/Documents/LihFolk-V2` paths in the gate with your
 cd tools/agent-hq && npm test
 ```
 
-Run this from your game's repo. In a bare copy of this folder, 4 of the 134 unit tests fail because they look for game files such as `assets/marketing/icon_draft.png`. The other 130 pass.
+Run this from your game's repo. If your game lacks the original project's files, 4 tests fail because they look for files such as `assets/marketing/icon_draft.png`.
 
 ## Rules that stay on
 
@@ -69,4 +66,6 @@ Run this from your game's repo. In a bare copy of this folder, 4 of the 134 unit
 
 ## Credits
 
-Built by the owner with Claude Code. `vault/04 Research/Research and Provenance.md` lists the sources. VFX Forge and LihFolk belong to their own authors and aren't included.
+- **LihFolk Vault V2** by LihFolk is installed from [its own repo](https://github.com/lihfolk-cy/v2-vault) under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The gate's search, code scan and quality rubrics come from it. The LihFolk Asset Pack isn't included: its licence forbids redistributing it, so get it from LihFolk.
+- **VFX Forge** isn't included. The vault's VFX skill works with your own copy.
+- `vault/04 Research/Research and Provenance.md` lists the other sources.

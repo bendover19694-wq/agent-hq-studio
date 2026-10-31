@@ -1,4 +1,5 @@
 // Agent HQ server: HTTP API, SSE, static files. Zero dependencies.
+import { createLink, mountLink, LINK_OWNER_ONLY } from './link.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -229,7 +230,7 @@ export async function realFetchLiveStats({ apiKey, universeId, dates }) {
  * startServer({root, port=4317, stateDir, dbFile, runner, fetchCharts}) -> Promise<{server, db, token (agent), ownerToken, port, close}>
  * runner: an object, or a factory ({db, root, emit, port, token}) => runner (started/stopped by the server).
  */
-export async function startServer({ root, port = 4317, stateDir, dbFile, runner, fetchCharts = realFetchCharts, now = Date.now, roles: rolesOpt, memoryDir, fetchLive = realFetchLive, fetchLiveStats = realFetchLiveStats, autoTimers = false, tickMs = 60000, fetchers: fetchersOpt = {} } = {}) {
+export async function startServer({ root, port = 4317, stateDir, dbFile, runner, linkFetch, fetchCharts = realFetchCharts, now = Date.now, roles: rolesOpt, memoryDir, fetchLive = realFetchLive, fetchLiveStats = realFetchLiveStats, autoTimers = false, tickMs = 60000, fetchers: fetchersOpt = {} } = {}) {
   const fetchers = { details: fetchGameDetails, icons: fetchIcons, thumbnails: fetchThumbnails, ...fetchersOpt };
   root = path.resolve(root ?? path.resolve(HERE, '../..'));
   stateDir = path.resolve(stateDir ?? path.join(root, '.agent-hq'));
@@ -313,8 +314,8 @@ Task: ${task.title}
 ${task.body}`;
     }
   };
-  const pubTask = (t) => { emit('task', clean(t)); processTask(clean(t)); return clean(t); };
-  const hookedEmit = (type, payload) => { emit(type, type === 'task' ? clean(payload) : payload); if (type === 'task') processTask(clean(payload)); };
+  const pubTask = (t) => { emit('task', clean(t)); processTask(clean(t)); link.taskChanged(clean(t)); return clean(t); };
+  const hookedEmit = (type, payload) => { emit(type, type === 'task' ? clean(payload) : payload); if (type === 'task') { processTask(clean(payload)); link.taskChanged(clean(payload)); } };
 
   // ---- review gates: reviewer/tester tasks after a role finishes; FAIL sends work back (max 3 attempts) ----
   const GATE_ENGINES = new Set(['app', 'claude-cli', 'echo', 'groq', 'nim']);
@@ -375,6 +376,7 @@ ${task.body}`;
     return t;
   };
   const queueTask = (f) => pubTask(D.createTask(db, f));
+  const link = createLink({ db, D, stateDir, emit, queueTask: (f) => queueTask(f), fetchImpl: linkFetch ?? globalThis.fetch });
   const postMessage = (f) => { const m = D.addMessage(db, f); emit('message', m); return m; };
 
   const gameRow = (g) => ({ ...g, ...D.gameWork(db, g.slug) });
@@ -400,7 +402,7 @@ ${task.body}`;
     ['GET', /^\/api\/games\/[^/]+\/gate$/], ['POST', /^\/api\/games\/[^/]+\/(?:gate\/(?:start|confirm|checklist)|ad-note)$/],
     ['POST', /^\/api\/pitches\/ideas$/], ['POST', /^\/api\/pitches\/[^/]+\/decide$/], ['POST', /^\/api\/stage-requests\/[^/]+\/decide$/],
     ['POST', /^\/api\/games$/], ['PATCH', /^\/api\/games\/[^/]+$/], ['POST', /^\/api\/games\/[^/]+\/mark-live$/],
-    ['POST', /^\/api\/settings$/], ['POST', /^\/api\/models\/(?:refresh|test)$/], ['POST', /^\/api\/(?:pause|resume)$/], ['POST', /^\/api\/tasks\/[^/]+\/(?:cancel|retry)$/],
+    ...LINK_OWNER_ONLY, ['POST', /^\/api\/settings$/], ['POST', /^\/api\/models\/(?:refresh|test)$/], ['POST', /^\/api\/(?:pause|resume)$/], ['POST', /^\/api\/tasks\/[^/]+\/(?:cancel|retry)$/],
     ['POST', /^\/api\/messages\/[^/]+\/reset$/], ['POST', /^\/api\/threads\/[^/]+\/read$/],
     ['POST', /^\/api\/market\/corpus$/], ['DELETE', /^\/api\/market\/corpus\/\d+$/], ['POST', /^\/api\/uploads$/],
   ];
@@ -425,6 +427,7 @@ ${task.body}`;
   const route = (method, re, fn, opts = {}) => routes.push([method, re, fn, opts]);
 
   route('GET', /^\/api\/health$/, () => ({ ok: true }));
+  mountLink(route, link, { str, bad, isObj, agentTask, HttpError });
 
   route('GET', /^\/api\/state$/, () => {
     const asks = D.listAsks(db);
@@ -609,6 +612,7 @@ ${task.body}`;
     }
     const done = D.answerAsk(db, a.id, { answer, verdict, verdictNote: note });
     emit('ask', done);
+    if (link.answered(a, answer)) return done;
     const task = a.taskId ? D.getTask(db, a.taskId) : null;
     const say = (text) => postMessage({ role: a.role, from: 'owner', text, taskId: a.taskId });
     if (a.kind === 'decision' || a.kind === 'try' || a.kind === 'approve') {
@@ -1422,6 +1426,7 @@ ${task.body}`;
     // scrape the providers' model lists at boot and then daily, so the pickers are filled
     catalog.refreshAll().catch(() => {});
     setInterval(() => catalog.refreshAll().catch(() => {}), 86400000).unref();
+    setInterval(() => link.poll(), 20000).unref();
   }
   rn = runnerOwned ? runner({ db, root, emit: hookedEmit, port: boundPort, token, memoryDir, providers: readProviders }) : (runner ?? null);
   if (runnerOwned) rn.start?.();

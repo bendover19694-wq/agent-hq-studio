@@ -98,11 +98,11 @@ test('initialize echoes protocol version', async () => {
   assert.equal(r.result.serverInfo.name, 'agent-hq');
 });
 
-test('tools/list has the 15 tools', async () => {
+test('tools/list has the 18 tools', async () => {
   const r = await task.rpc('tools/list', {});
   assert.deepEqual(r.result.tools.map((t) => t.name).sort(), [
     'hq_add_media', 'hq_ask_owner', 'hq_asset_add', 'hq_claim_task', 'hq_complete', 'hq_create_task', 'hq_lane_gate',
-    'hq_learn', 'hq_list_tasks', 'hq_metric', 'hq_next_task', 'hq_note', 'hq_pitch', 'hq_stage_request', 'hq_vault',
+    'hq_learn', 'hq_link_read', 'hq_link_say', 'hq_link_share', 'hq_list_tasks', 'hq_metric', 'hq_next_task', 'hq_note', 'hq_pitch', 'hq_stage_request', 'hq_vault',
   ]);
 });
 
