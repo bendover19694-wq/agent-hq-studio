@@ -1,0 +1,4 @@
+.agent-hq/
+node_modules/
+*.log
+.env

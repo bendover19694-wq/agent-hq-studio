@@ -1,0 +1,174 @@
+# Agent HQ
+
+A local control room for the Roblox agent team. You message each of 16 role agents individually in a Teams-style chat, approve their output in one inbox ("Needs you"), and watch them work. No npm dependencies, only Node 24+. No `claude` or `agy` command line needed.
+
+## Start
+
+- **Open it:** double-click **"Agent HQ"** on your desktop, or `scripts/Agent HQ.bat`. It starts HQ in the background if it is not running and opens a signed-in tab (`http://127.0.0.1:4317/#owner=<owner token>`).
+- **Always on:** run `scripts/install-agent-hq-autostart.bat` once. HQ then starts hidden every time you sign in to Windows, and a keep-alive (`tools/agent-hq/keepalive.mjs`) restarts it within seconds if it crashes. `scripts/uninstall-agent-hq-autostart.bat` removes the autostart and the desktop shortcut.
+- **Logs:** `.agent-hq/logs/server.log`. **Stop it:** end the two `node` processes in Task Manager (the keep-alive and the server).
+
+The page keeps the owner token in that browser's localStorage and removes it from the address bar. Opening http://127.0.0.1:4317 directly only works in a browser that has signed in once; otherwise it shows "Sign in to Agent HQ", so use the shortcut again. You can also start the server by hand with `node tools/agent-hq/server.mjs`. State lives in `<repo>/.agent-hq/` (gitignored): `hq.db`, `owner-token` (yours), `token` (the agents'), `logs/`, `media/`. Role memory is in `tools/agent-hq/memory/` (committed).
+
+## Using it
+
+- **Team**: a roster of all 16 roles with status (working, queued, review, idle). Click one to open its chat. Whatever you send becomes a task for that role; messages wait their turn while it is working. Buttons: New task, Lessons (what the role has learned), Start fresh (new conversation), Stop (cancel the working task).
+- **Lead**: the same chat for the Lead, who plans and delegates to the others.
+- **Tasks**: board of queued, working, review and done. Gate tasks carry a "gate" tag and an attempt number.
+- **Review**: everything waiting for you: decisions, things to try, images to approve.
+- **Pitches / Market / Library / Settings**: scout pitches, Roblox charts, the knowledge vault and skills, lane cadence and budget.
+
+## Pages
+
+- **Games**: one tab per game, with three sub-tabs.
+  - *Overview*: version, what is new in it, the next step and a note (both editable), how many times it was sent back for rework, open work with states, what is on your to-do list, and a link to the publish gate.
+  - *Live numbers*: a "Connect live numbers" form (see Live telemetry below), then a live strip (playing now, servers, slowest server, worst ping, peak 24 hours, joins and leaves, first-minute bounce, Robux and errors in the last hour, versions running), daily tiles with their source and target (players, visits, like ratio, day-1 and day-7 retention, session length, paying share), and chart tabs: Trends (Roblox public data), Players (daily active users, players per hour, plays by source, day-1 by source, country, language, device), Sessions, money and errors, Where players leave, Benchmarks and a Fix ledger. Anything the game cannot report shows "not measured", never a made-up number.
+  - *Pipeline*: nine stages from Pitched to Graded with the role that owns each. The game sits in its current stage; open stage requests and tasks show in their columns, and a drawer holds the stage history. Approve a request, Hold it with a reason, or Reject it with a reason and optional failed-criteria ids (Producer rubric ids such as `G5 S4`). Rejections add to the game's rework count and show in a "Kicked back" list.
+- **Publish gate** (`#/games/<slug>/gate`): the irreversible acts only you can do. Make a version live and set the experience public both need two steps: step 1 opens a 2-minute confirmation that changes nothing; step 2 needs you to type the game's slug before the button works, and it only accepts a real mouse click. "Spend ad money" is advisory: it records your note and nothing else. A human-only checklist (played on a phone, checked the store page, read the monetization policy) sits next to the acts, and the reversible review decisions are below a divider. HQ never publishes, goes public or spends money; it only records that you did.
+- **Pitches**: tabs for Needs your decision, Waiting on Scout, Your ideas and History. Each card shows the window and the game type (Collect and upgrade, Steal and escape, Survive and extract, Build and defend, Find the hidden, Race and rank, Tycoon and expand, Guess and reveal, Clean and restore, Raise and evolve), how we differ, stat tiles (Money (top earning), top comparable playing, its likes, Growth (upvotes/day), similar games), the money verdict, custom systems to build and the biggest risk, then collapsible sections: The game, Closest competitors, Evidence, Building it, Risks. A pitch missing required fields shows a banner and cannot be approved until the Scout fixes it. Actions: Approve, Edit and approve, Send to Scout (your note goes to the Scout), Decline. Approving one withdraws the other open pitches. Compare lines up 2 or 3 ticked pitches; New game idea hands your own idea (and anything else you want to add) to the Scout.
+- **Market**: five steps. 1, Charts: all of the Roblox chart lists (about 23, including Top Earning paged to about 300 games and every genre trending list) with the biggest rank moves between the two latest snapshots, one tab per list, and a table with rank change, players, change, likes, votes and how many lists a game is on. 2, Corpus: reference games with icon and screenshots (click to enlarge), added or removed by universe id. 3, Titles: how the charting games are named (verb, article, noun share, verb-first share, emoji share, word and length distributions, common first words). 4, Benchmarks: the targets a game should hit, how each is measured, what a miss means and where the number comes from. 5, Breakouts: young games that are growing quickly, with a help line under each column. HQ refreshes the market data by itself every `marketEveryHours` hours (a setting, default 6, 0 turns it off); Refresh does it on demand.
+- **Library**: Assets (search by name or tag, filter by kind and scope, Roblox upload status, a button that copies the Roblox asset id, click an image to enlarge), Systems (the catalogue in `systems.md`, with a search box), Vault (the knowledge chapters) and Skills.
+
+## Live telemetry
+
+The game reports counts and nothing personal: `StatsService` (in `src/server/Services`) folds joins, leaves, purchases, errors and frame rates into aggregates with no user ids, and every minute writes them to a DataStore called `HQStats`. HQ reads that DataStore through Roblox Open Cloud. Nothing is measurable until the game is published and has players (in Studio the writes fail silently).
+
+1. In the Creator Hub, open the experience, go to Open Cloud, API Keys, and create a key. Give it DataStore read permission for this experience, limited to `HQStats`. No write access, no other permissions.
+2. In HQ open Games, Live numbers, Connect live numbers, paste the key and the universe id, and press Save and fetch.
+3. HQ keeps the key in `.agent-hq/opencloud.json` (owner-only, never sent back to the page; the page only learns "connected"). It refreshes every 15 minutes, and Refresh does it now.
+
+The Roblox public numbers (players, visits, favorites, likes) only need the universe id.
+
+## Visual bar
+
+In Review, the Visual bar tab holds the images you pinned as house references, by category: Packaging, UI icons, 3D models, Screens. Pin an approved image there and every designer, thumbnails and ui brief lists it as the house reference for every hand-off, so new art matches the look you already approved.
+
+## Roles and skills
+
+`roles.json` is the source of truth. Each role has a model, an `agentType`, the skills it must use, the tools it should prefer, a definition of done, and the roles that check its work (`gates`).
+
+| Role | Runs in | Skills (when) | Gates |
+|---|---|---|---|
+| lead | Claude app | roblox-agent-team; brainstorming (new idea); writing-plans (3+ steps) | none |
+| scout | Claude app | agent-reach, watch, deep-research | none |
+| architect | Claude app | writing-plans; grill:roast | none |
+| builder | Claude app | test-driven-development; systematic-debugging; verification-before-completion | reviewer, playtester |
+| ui | Claude app | roblox-concept-art-ui; taste-skill:redesign-skill; verification-before-completion | reviewer, kid-tester |
+| world | Claude app | verification-before-completion | playtester |
+| librarian | Claude app | verification-before-completion | reviewer |
+| economy | Claude app | test-driven-development; dataviz | reviewer |
+| merchant | Claude app | test-driven-development; pricing (research only) | reviewer |
+| kid-tester | Claude app | run | none |
+| playtester | Claude app | run; systematic-debugging (report, do not fix) | none |
+| reviewer | Claude app | code-review; security-review | none |
+| producer | Claude app | verification-before-completion | none |
+| liveops | Claude app | roblox-launch-tips; dataviz | none |
+| designer | Antigravity | art-direction rule + UI concept skill | none |
+| thumbnails | Antigravity | art-direction rule + store art skill | none |
+
+Each brief is built from the repo hard rules, the skills to invoke, preferred tools, the role's vault chapters, owned files, the role's lessons, the last messages of the conversation, the task and the definition of done. Only the Lead can create tasks for others.
+
+## Reference library
+
+`research/exemplars/` holds the data agents learn from, read on demand (each file starts with a TL;DR): `core-loops.md` (36 hit games' loops and first-session templates), `mechanics-catalog.md` (~90 engagement mechanics with tuning numbers and idle-economy formulas), `game-ui.md` (Roblox UI facts, screen exemplars, scoring rubric), `thumbnails-icons.md` (store-art specs, 50 exemplars, A/B testing), `market-data-sources.md` (verified Roblox data endpoints, benchmarks, the Run a ___ genre) and `llm-providers.md`. Each role's brief lists only its files (`library` in `roles.json`), so nothing is pasted into every brief.
+
+Briefs are kept small to save usage: up to 3 vault chapters inline (more become a list to read with `hq_vault`), the newest 10 lessons, the last 6 messages; Groq/NIM briefs are smaller still.
+
+## Quality gates and memory
+
+- **Gates**: when a role finishes, HQ queues its checkers (for example Reviewer and Playtester after a Builder task). A checker starts its summary with PASS or FAIL. FAIL queues a Fix task for the original role with the feedback; after 3 attempts it becomes a decision for you. When every gate passes, the task is marked done.
+- **Memory**: roles record reusable lessons (`hq_learn`); the newest 10 are included in every later brief. Edit or prune `memory/<role>.md` by hand if one is wrong.
+
+## Engines and lanes
+
+Work is done by two apps, each pulling tasks from its own lane with the `hq_next_task` MCP tool. A task waits in the queue until a session of that app claims it.
+
+| Engine | Who runs it | Default for |
+|---|---|---|
+| `app` ("Claude app") | A Claude Code desktop session | every role except designer and thumbnails |
+| `antigravity` ("Antigravity (design)") | An Antigravity agent, using its built-in `generate_image` | designer, thumbnails |
+| `claude-cli` (optional) | HQ spawns `claude -p` itself (needs the `claude` CLI; `--permission-mode acceptEdits` plus a per-role allow-list) | never |
+| `groq` ("Groq") | HQ itself, through `llm-agent.mjs` and your Groq key | never; pick it per role |
+| `nim` ("NVIDIA NIM") | HQ itself, through `llm-agent.mjs` and your NIM key | never; pick it per role |
+| `echo` | Fake engine for tests and dry runs | never |
+
+The engine is chosen when a task is created: the task's own engine, else the role's setting (Settings, Agent models), else the role default.
+
+### Groq and NVIDIA NIM (save your Claude usage)
+
+1. Settings, Model providers: paste a Groq key (`gsk_...`, console.groq.com) and/or an NVIDIA NIM key (`nvapi-...`, build.nvidia.com). Keys go to `.agent-hq/providers.json` and are never sent back to the page.
+2. Settings, Agent models: pick an engine and model per role, or press **Saver preset** (Sonnet for lead, architect and reviewer; scout, kid-tester, producer and liveops on Groq or NIM). Press **Test** next to a Groq/NIM model before relying on it.
+3. HQ runs those tasks itself with `llm-agent.mjs`: read, list and search the repo, `fetch_url` for public pages, `write_file`/`edit_file` only inside the role's own `files`, `run_check` only for the role's allow-listed commands (stylua, selene, lune, rojo, luau-lsp...), and the `hq_*` reporting tools. No shell. Gates (reviewer, playtester) still check the work.
+
+The model lists fill themselves: NVIDIA's public catalogue is read at every start and daily (no key needed), Groq's once a key is saved; "Refresh model lists" does it now. The best tool-calling models are listed first and "Auto" picks the top one.
+
+Limits worth knowing (details and sources: `research/exemplars/llm-providers.md`):
+- Groq free tier: about 30 requests, 8K tokens a minute and 200K tokens a day per model. HQ keeps each Groq request under about 20K characters by trimming old tool results, and retries 429s.
+- NIM: about 40 requests a minute per key across all models. Its list includes models that are no longer served (404/410), so Test a model first.
+- Keep Luau code roles (builder, ui, economy) and the Lead on Claude: none of these models has a Luau track record. Use Groq/NIM for research, text review, status and summaries.
+
+### Claude app lane
+
+1. The repo-root `.mcp.json` registers the `agent-hq` MCP server. Open the project in Claude Code desktop.
+2. In a session, run `/hq-worker`. It checks HQ is up (and starts it if not), asks the lane gate whether to work, claims tasks, runs each as a subagent with the role's `agentType` and model, and reports back.
+3. The unattended run already exists in the Claude app: Scheduled, "Agent HQ worker (hourly check-in)", which runs at :14 past every hour. It only asks the lane gate whether to work, so you change cadence in HQ (Settings > Lanes), not in the app.
+
+### Antigravity lane (design only)
+
+1. Register the HQ tools and the design automation once:
+   ```powershell
+   node tools/agent-hq/register-antigravity.mjs --dry-run   # preview
+   node tools/agent-hq/register-antigravity.mjs             # write (makes .bak copies first)
+   node tools/agent-hq/register-antigravity.mjs --remove    # undo
+   ```
+2. In Antigravity, turn on "Agent HQ design lane" under Automations (HQ never enables it for you), or run `/hq-design` by hand (`.agents/workflows/hq-design.md`).
+3. Images are saved to `assets/concepts/` and show up under "Needs you". Approving a designer task queues a `ui` task that rebuilds the concept as Luau.
+4. Antigravity must follow the art rules: `.agents/rules/agent-hq-art-direction.md` (strict rules and a scored self-check), `.agents/skills/roblox-ui-concept/SKILL.md` (UI mockups) and `.agents/skills/roblox-store-art/SKILL.md` (icons, thumbnails, passes, products, badges). Every antigravity brief points at them.
+
+## Cadence
+
+The outside schedulers fire at a fixed base rate: the Claude app task hourly, the Antigravity automation every 20 minutes. On every fire the worker first calls the lane gate (`hq_lane_gate`). HQ decides from Settings > Lanes whether it works now, so you change cadence in HQ, never in the apps.
+
+Per lane you can set: Enabled, Work every (Claude app 1 to 24 hours, Antigravity 20 minutes to 24 hours), Active hours from/to, and Max tasks per run. Overnight windows work (for example 22:00 to 06:00). The gate says no when the lane is disabled, HQ is paused, the queue is empty, it is outside active hours, or the lane ran too recently. A person asking in chat (`manual`) skips the hours and spacing checks but not the disabled, paused and empty checks. Times are this computer's local time.
+
+Run on schedules or events, not 24/7, or you burn usage. Pause HQ when you step away.
+
+Recurring tasks (Settings, Schedules), where present, are separate: they enqueue a task every N minutes.
+
+## hqctl (when MCP tools are not loaded)
+
+```powershell
+node tools/agent-hq/hqctl.mjs --help
+node tools/agent-hq/hqctl.mjs gate app --manual
+node tools/agent-hq/hqctl.mjs next app
+node tools/agent-hq/hqctl.mjs complete <taskId> "summary" --state review
+```
+
+Run it from the repo root. It reads `.agent-hq/token`, talks to the local server and prints JSON. It also has `note`, `ask`, `media`, `learn`, `pitch` and `market`.
+
+## Why this beats one Claude chat
+
+- Specialists with only their own vault chapters, skills and tools, instead of one chat holding everything.
+- Automatic review: a Reviewer and a tester check every code change and send failures back, up to 2 rework rounds, before it reaches you.
+- Lessons carry over: each role's memory is part of every later brief.
+- A persistent conversation per role, so you message the Builder and the Merchant separately.
+- Parallel work under a budget, with a Studio lock so only one task drives Studio.
+- You only approve: images, decisions, things to try. Agents never publish, spend Robux or install tools.
+
+## Safety
+
+- Binds `127.0.0.1` only. Every `/api/*` call except `/api/health` needs the `x-hq-token` header. There are two credentials: the owner token (`.agent-hq/owner-token`, used only by the dashboard and never embedded in the page; it reaches the browser in the URL fragment, which is never sent to the server) and the agent token (`.agent-hq/token`, read by MCP and `hqctl`, which cannot do owner-only things such as approving or marking a game live). No CORS.
+- Bodies over 1 MB are rejected; every input is validated. Spawned processes use an args array, never a shell.
+- Agents never publish, spend Robux or install tools (see `CLAUDE.md`). Anything the owner must decide shows up under "Needs you".
+- Studio is shared: one task holds the Studio lock at a time.
+- The publish gate and the Open Cloud key are owner-only: agent tokens get a 403, the key is never returned by any route, and going live or public needs the typed slug and a real mouse click.
+- Each claimed task carries its own `taskToken`, printed in its brief. Calls that act on a task (`hq_complete`, `hq_note`, ...) must present that task's token, so one agent cannot report on another's task. The worker gives each brief to its own subagent only and passes the matching token when it completes a task itself.
+- HQ never turns on the Antigravity automation or a Claude app scheduled task for you.
+
+## Tests
+
+```powershell
+cd tools/agent-hq
+npm test                 # unit tests, then the smoke run
+node test/smoke.mjs      # end to end with the echo engine, prints PASS
+```
